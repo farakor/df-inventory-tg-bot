@@ -36,4 +36,5 @@ ENV/
 # Local configuration
 .env
 config.local.py
-credentials.json 
+credentials.json
+token.json 
