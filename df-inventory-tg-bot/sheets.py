@@ -13,17 +13,41 @@ def get_google_sheets_service():
     """Получение сервиса Google Sheets"""
     creds = None
     if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        except Exception as e:
+            logging.error(f"Error loading credentials from token.json: {str(e)}")
+            creds = None
     
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            # Используем localhost:8080 как URI перенаправления
-            creds = flow.run_local_server(port=8080)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                logging.error(f"Error refreshing credentials: {str(e)}")
+                creds = None
+        
+        if not creds:
+            try:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'credentials.json',
+                    SCOPES
+                )
+                creds = flow.run_local_server(
+                    port=8080,
+                    access_type='offline',
+                    prompt='consent'
+                )
+            except Exception as e:
+                logging.error(f"Error in authorization flow: {str(e)}")
+                raise
+        
+        # Сохраняем учетные данные для следующего запуска
+        try:
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
+        except Exception as e:
+            logging.error(f"Error saving credentials to token.json: {str(e)}")
     
     return build('sheets', 'v4', credentials=creds)
 
@@ -31,17 +55,41 @@ def get_drive_service():
     """Получение сервиса Google Drive"""
     creds = None
     if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        except Exception as e:
+            logging.error(f"Error loading credentials from token.json: {str(e)}")
+            creds = None
     
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            # Используем localhost:8080 как URI перенаправления
-            creds = flow.run_local_server(port=8080)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                logging.error(f"Error refreshing credentials: {str(e)}")
+                creds = None
+        
+        if not creds:
+            try:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'credentials.json',
+                    SCOPES
+                )
+                creds = flow.run_local_server(
+                    port=8080,
+                    access_type='offline',
+                    prompt='consent'
+                )
+            except Exception as e:
+                logging.error(f"Error in authorization flow: {str(e)}")
+                raise
+        
+        # Сохраняем учетные данные для следующего запуска
+        try:
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
+        except Exception as e:
+            logging.error(f"Error saving credentials to token.json: {str(e)}")
     
     return build('drive', 'v3', credentials=creds)
 
