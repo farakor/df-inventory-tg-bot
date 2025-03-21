@@ -13,6 +13,10 @@ from config import WAREHOUSES, PRODUCT_CATEGORIES
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(
@@ -23,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Константы
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-TELEGRAM_TOKEN = '7877667795:AAGL7oIUMWpztvw2N3TV2WBkjCmx7yqxI3c'  # Замените на ваш токен бота
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # Получаем токен из переменных окружения
 CACHE_TIMEOUT = 300  # Увеличиваем время жизни кэша до 5 минут
 REQUEST_TIMEOUT = 30  # Таймаут для запросов в секундах
 
