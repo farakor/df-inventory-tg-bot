@@ -8,13 +8,15 @@ from datetime import datetime
 import logging
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+TOKEN_PATH = 'token.json'
+CREDENTIALS_PATH = 'credentials.json'
 
 def get_google_sheets_service():
     """Получение сервиса Google Sheets"""
     creds = None
-    if os.path.exists('token.json'):
+    if os.path.exists(TOKEN_PATH):
         try:
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
         except Exception as e:
             logging.error(f"Error loading credentials from token.json: {str(e)}")
             creds = None
@@ -30,21 +32,28 @@ def get_google_sheets_service():
         if not creds:
             try:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json',
+                    CREDENTIALS_PATH,
                     SCOPES
                 )
+                # Принудительно запрашиваем новый токен с refresh_token
                 creds = flow.run_local_server(
                     port=8080,
                     access_type='offline',
-                    prompt='consent'
+                    prompt='consent',
+                    authorization_prompt_message='Please authorize the application'
                 )
+                
+                # Проверяем наличие refresh_token
+                if not hasattr(creds, 'refresh_token'):
+                    raise ValueError("Failed to obtain refresh_token. Please try again.")
+                    
             except Exception as e:
                 logging.error(f"Error in authorization flow: {str(e)}")
                 raise
         
         # Сохраняем учетные данные для следующего запуска
         try:
-            with open('token.json', 'w') as token:
+            with open(TOKEN_PATH, 'w') as token:
                 token.write(creds.to_json())
         except Exception as e:
             logging.error(f"Error saving credentials to token.json: {str(e)}")
@@ -54,9 +63,9 @@ def get_google_sheets_service():
 def get_drive_service():
     """Получение сервиса Google Drive"""
     creds = None
-    if os.path.exists('token.json'):
+    if os.path.exists(TOKEN_PATH):
         try:
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
         except Exception as e:
             logging.error(f"Error loading credentials from token.json: {str(e)}")
             creds = None
@@ -72,21 +81,28 @@ def get_drive_service():
         if not creds:
             try:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json',
+                    CREDENTIALS_PATH,
                     SCOPES
                 )
+                # Принудительно запрашиваем новый токен с refresh_token
                 creds = flow.run_local_server(
                     port=8080,
                     access_type='offline',
-                    prompt='consent'
+                    prompt='consent',
+                    authorization_prompt_message='Please authorize the application'
                 )
+                
+                # Проверяем наличие refresh_token
+                if not hasattr(creds, 'refresh_token'):
+                    raise ValueError("Failed to obtain refresh_token. Please try again.")
+                    
             except Exception as e:
                 logging.error(f"Error in authorization flow: {str(e)}")
                 raise
         
         # Сохраняем учетные данные для следующего запуска
         try:
-            with open('token.json', 'w') as token:
+            with open(TOKEN_PATH, 'w') as token:
                 token.write(creds.to_json())
         except Exception as e:
             logging.error(f"Error saving credentials to token.json: {str(e)}")
