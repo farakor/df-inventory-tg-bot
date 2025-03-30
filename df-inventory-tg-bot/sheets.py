@@ -1,182 +1,127 @@
 import os
-import pickle
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+import logging
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
-import logging
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-TOKEN_PATH = 'token.json'
-CREDENTIALS_PATH = 'credentials.json'
+SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service-account-key.json')
 
 def get_google_sheets_service():
     """Получение сервиса Google Sheets"""
-    creds = None
-    if os.path.exists(TOKEN_PATH):
-        try:
-            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
-        except Exception as e:
-            logging.error(f"Error loading credentials from token.json: {str(e)}")
-            creds = None
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-            except Exception as e:
-                logging.error(f"Error refreshing credentials: {str(e)}")
-                creds = None
-        
-        if not creds:
-            try:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    CREDENTIALS_PATH,
-                    SCOPES
-                )
-                # Принудительно запрашиваем новый токен с refresh_token
-                creds = flow.run_local_server(
-                    port=8080,
-                    access_type='offline',
-                    prompt='consent',
-                    authorization_prompt_message='Please authorize the application'
-                )
-                
-                # Проверяем наличие refresh_token
-                if not hasattr(creds, 'refresh_token'):
-                    raise ValueError("Failed to obtain refresh_token. Please try again.")
-                    
-            except Exception as e:
-                logging.error(f"Error in authorization flow: {str(e)}")
-                raise
-        
-        # Сохраняем учетные данные для следующего запуска
-        try:
-            with open(TOKEN_PATH, 'w') as token:
-                token.write(creds.to_json())
-        except Exception as e:
-            logging.error(f"Error saving credentials to token.json: {str(e)}")
-    
-    return build('sheets', 'v4', credentials=creds)
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=SCOPES
+        )
+        return build('sheets', 'v4', credentials=credentials)
+    except Exception as e:
+        logging.error(f"Error creating sheets service: {str(e)}")
+        raise
 
 def get_drive_service():
     """Получение сервиса Google Drive"""
-    creds = None
-    if os.path.exists(TOKEN_PATH):
-        try:
-            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
-        except Exception as e:
-            logging.error(f"Error loading credentials from token.json: {str(e)}")
-            creds = None
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-            except Exception as e:
-                logging.error(f"Error refreshing credentials: {str(e)}")
-                creds = None
-        
-        if not creds:
-            try:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    CREDENTIALS_PATH,
-                    SCOPES
-                )
-                # Принудительно запрашиваем новый токен с refresh_token
-                creds = flow.run_local_server(
-                    port=8080,
-                    access_type='offline',
-                    prompt='consent',
-                    authorization_prompt_message='Please authorize the application'
-                )
-                
-                # Проверяем наличие refresh_token
-                if not hasattr(creds, 'refresh_token'):
-                    raise ValueError("Failed to obtain refresh_token. Please try again.")
-                    
-            except Exception as e:
-                logging.error(f"Error in authorization flow: {str(e)}")
-                raise
-        
-        # Сохраняем учетные данные для следующего запуска
-        try:
-            with open(TOKEN_PATH, 'w') as token:
-                token.write(creds.to_json())
-        except Exception as e:
-            logging.error(f"Error saving credentials to token.json: {str(e)}")
-    
-    return build('drive', 'v3', credentials=creds)
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=SCOPES
+        )
+        return build('drive', 'v3', credentials=credentials)
+    except Exception as e:
+        logging.error(f"Error creating drive service: {str(e)}")
+        raise
 
 def get_or_create_folder(drive_service, folder_name="Инвентаризации ДФ Сервис"):
     """Получить или создать папку в Google Drive"""
-    # Проверяем, существует ли папка
-    results = drive_service.files().list(
-        q=f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-        fields="files(id, name)"
-    ).execute()
-    folders = results.get('files', [])
-    
-    if folders:
-        # Папка существует, возвращаем её ID
-        return folders[0]['id']
-    else:
-        # Создаем новую папку
-        folder_metadata = {
-            'name': folder_name,
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
-        folder = drive_service.files().create(
-            body=folder_metadata,
-            fields='id'
+    try:
+        logging.info(f"Поиск папки '{folder_name}' в Google Drive")
+        # Проверяем, существует ли папка
+        results = drive_service.files().list(
+            q=f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id, name)"
         ).execute()
-        return folder.get('id')
+        folders = results.get('files', [])
+        
+        if folders:
+            logging.info(f"Папка '{folder_name}' найдена с ID: {folders[0]['id']}")
+            # Папка существует, возвращаем её ID
+            return folders[0]['id']
+        else:
+            logging.info(f"Папка '{folder_name}' не найдена, создаем новую")
+            # Создаем новую папку
+            folder_metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder'
+            }
+            folder = drive_service.files().create(
+                body=folder_metadata,
+                fields='id'
+            ).execute()
+            logging.info(f"Создана новая папка с ID: {folder.get('id')}")
+            return folder.get('id')
+    except Exception as e:
+        logging.error(f"Ошибка при создании/поиске папки: {str(e)}")
+        raise
 
 def get_or_create_spreadsheet(sheets_service, drive_service, warehouse_name):
     """Получить или создать таблицу для склада"""
-    # Получаем или создаем папку
-    folder_id = get_or_create_folder(drive_service)
-    
-    # Ищем существующую таблицу в папке
-    results = drive_service.files().list(
-        q=f"name='{warehouse_name}' and mimeType='application/vnd.google-apps.spreadsheet' and '{folder_id}' in parents and trashed=false",
-        fields="files(id, name)"
-    ).execute()
-    files = results.get('files', [])
-    
-    if files:
-        # Таблица существует
-        return files[0]['id']
-    
-    # Создаем новую таблицу
-    spreadsheet = {
-        'properties': {
-            'title': warehouse_name
+    try:
+        logging.info(f"Поиск или создание таблицы для склада '{warehouse_name}'")
+        # Получаем или создаем папку
+        folder_id = get_or_create_folder(drive_service)
+        logging.info(f"Получен ID папки: {folder_id}")
+        
+        # Ищем существующую таблицу в папке
+        results = drive_service.files().list(
+            q=f"name='{warehouse_name}' and mimeType='application/vnd.google-apps.spreadsheet' and '{folder_id}' in parents and trashed=false",
+            fields="files(id, name)"
+        ).execute()
+        files = results.get('files', [])
+        
+        if files:
+            logging.info(f"Найдена существующая таблица с ID: {files[0]['id']}")
+            # Таблица существует
+            return files[0]['id']
+        
+        logging.info("Создание новой таблицы")
+        # Создаем новую таблицу
+        spreadsheet = {
+            'properties': {
+                'title': warehouse_name
+            }
         }
-    }
-    spreadsheet = sheets_service.spreadsheets().create(
-        body=spreadsheet,
-        fields='spreadsheetId'
-    ).execute()
-    
-    # Перемещаем таблицу в папку
-    file_id = spreadsheet.get('spreadsheetId')
-    file = drive_service.files().get(
-        fileId=file_id,
-        fields='parents'
-    ).execute()
-    previous_parents = ",".join(file.get('parents', []))
-    
-    # Перемещаем файл в нужную папку
-    drive_service.files().update(
-        fileId=file_id,
-        addParents=folder_id,
-        removeParents=previous_parents,
-        fields='id, parents'
-    ).execute()
-    
-    return file_id
+        spreadsheet = sheets_service.spreadsheets().create(
+            body=spreadsheet,
+            fields='spreadsheetId'
+        ).execute()
+        
+        # Перемещаем таблицу в папку
+        file_id = spreadsheet.get('spreadsheetId')
+        logging.info(f"Создана новая таблица с ID: {file_id}")
+        
+        file = drive_service.files().get(
+            fileId=file_id,
+            fields='parents'
+        ).execute()
+        previous_parents = ",".join(file.get('parents', []))
+        
+        # Перемещаем файл в нужную папку
+        drive_service.files().update(
+            fileId=file_id,
+            addParents=folder_id,
+            removeParents=previous_parents,
+            fields='id, parents'
+        ).execute()
+        logging.info(f"Таблица перемещена в папку {folder_id}")
+        
+        return file_id
+    except Exception as e:
+        logging.error(f"Ошибка при создании/поиске таблицы: {str(e)}")
+        raise
 
 def get_next_sheet_number(service, spreadsheet_id, base_title):
     """Получает следующий доступный номер для листа с указанным базовым названием"""
@@ -287,10 +232,12 @@ def create_new_sheet(service, spreadsheet_id, warehouse, date):
 def save_inventory_data(service, spreadsheet_id, warehouse_name, date, user_name, phone, inventory_data):
     """Сохранение данных инвентаризации в таблицу"""
     try:
+        logging.info(f"Начало сохранения данных для склада {warehouse_name}")
         # Получаем название последнего созданного листа для этой даты
         base_title = f"Инвентаризация {date}"
         next_number = get_next_sheet_number(service, spreadsheet_id, base_title)
         sheet_title = f"{base_title}_{next_number-1}"  # Используем текущий лист
+        logging.info(f"Используем лист: {sheet_title}")
         
         # Подготовка данных для записи
         header_values = [
@@ -313,16 +260,20 @@ def save_inventory_data(service, spreadsheet_id, warehouse_name, date, user_name
             product_values.append([i, product, quantity, unit])
         
         values = header_values + product_values
+        logging.info(f"Подготовлено {len(values)} строк данных для записи")
         
         # Обновляем данные на листе
+        logging.info("Начинаем запись данных в таблицу")
         service.spreadsheets().values().update(
             spreadsheetId=spreadsheet_id,
             range=f"{sheet_title}!A1:D{len(values)}",
             valueInputOption='RAW',
             body={'values': values}
         ).execute()
+        logging.info("Данные успешно записаны в таблицу")
         
         # Получаем ID листа для форматирования
+        logging.info("Получаем ID листа для форматирования")
         sheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
         sheet_id = None
         for sheet in sheet_metadata.get('sheets', ''):
@@ -331,6 +282,7 @@ def save_inventory_data(service, spreadsheet_id, warehouse_name, date, user_name
                 break
         
         if sheet_id:
+            logging.info(f"Найден ID листа: {sheet_id}")
             # Форматирование таблицы
             requests = [
                 # Объединяем ячейки в заголовке для каждой строки информации
@@ -467,14 +419,19 @@ def save_inventory_data(service, spreadsheet_id, warehouse_name, date, user_name
             ])
             
             # Применяем форматирование
+            logging.info("Применяем форматирование таблицы")
             service.spreadsheets().batchUpdate(
                 spreadsheetId=spreadsheet_id,
                 body={'requests': requests}
             ).execute()
+            logging.info("Форматирование успешно применено")
+        else:
+            logging.warning("Не удалось найти ID листа для форматирования")
         
+        logging.info("Сохранение данных успешно завершено")
         return True
     except Exception as e:
-        print(f"Ошибка при сохранении данных: {e}")
+        logging.error(f"Ошибка при сохранении данных: {str(e)}")
         return False
 
 def get_inventory_history(service, spreadsheet_id, warehouse_name):

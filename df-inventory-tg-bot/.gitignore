@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Конфиденциальные файлы
+.env
+service-account-key.json
+token.json
+credentials.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Логи
+*.log 
